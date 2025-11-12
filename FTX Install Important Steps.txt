@@ -1,0 +1,10 @@
+Turn off windows firewall
+Install dotnet windows features
+
+
+Zoho Assist Install Link:
+https://assist.zoho.com/unattended-installer?encapiKey=wSsVRa0g%2FhDzCPgvnjKpIb05zV9RB1mlQxx80VL163euTfDBosc8khDLUFKhTfgfFDQ4RmFGp%2B4rykwHgDMIidp5yF9UACiF9mqRe1U4J3x1p7rvlz7JVm1dkxOIL4wMzw5jmw%3D%3D&x-com-zoho-assist-orgid=767936559
+
+
+Sync all tables:
+ctrl+shift+o
