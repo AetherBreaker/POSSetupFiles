@@ -50,5 +50,7 @@ if (-not (Test-Path $ExtensionFolderPath)) {
 }
 Invoke-WebRequest -Uri $UblockSource -OutFile "$ExtensionFolderPath\$ExtensionFileName"
 
+.\WinSetView.ps1 .\POSDefaults.ini
+
 Write-Host "Press Enter to exit..." -NoNewline
 $null = Read-Host
