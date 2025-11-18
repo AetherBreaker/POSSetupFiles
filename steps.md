@@ -54,3 +54,5 @@
     - Once installed, it will request activation. User must hit cancel on the activation as this step is performed later when the credit card machine is setup by FTX. Likely cannot be done from command line.
 22. Install [Epson TM-T88VI Utility](https://drive.google.com/file/d/11KmFe2KBC-5q2LPrVfuaJMBUzd3E2CGZ/view?usp=sharing)
     - This file was also too big to be uploaded to github, but it will be located in [this folder](https://github.com/AetherBreaker/POSSetupFiles/tree/main/Installer%20Files%20Directory/FTX%20Device%20Drivers)
+23. Enable ForceBiometricTimeClock=1
+    - File location is: C:\ProgramData\FasTraxPOS\Config\FTXConfiguration.ini
