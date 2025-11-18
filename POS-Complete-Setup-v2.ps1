@@ -18,16 +18,16 @@
 #>
 
 param(
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [string]$BackupAdminUser = "BackupAdmin",
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipManualInstallers,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$NoRestart,
 
-    [Parameter(Mandatory=$false)]
+    [Parameter(Mandatory = $false)]
     [switch]$SkipBackupAdmin
 )
 
@@ -172,7 +172,8 @@ function Install-SilentlyIfPossible {
         Write-LogMessage "Attempting silent install with argument: $arg" "Info"
         try {
             $process = Start-Process -FilePath $InstallerPath -ArgumentList $arg -Wait -PassThru -WindowStyle Hidden
-            if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) { # 3010 = success, reboot required
+            if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
+                # 3010 = success, reboot required
                 Write-LogMessage "$ProductName installed successfully (silent)" "Success"
                 return $true
             }
@@ -226,7 +227,8 @@ if (-not $SkipBackupAdmin) {
     try {
         # Use net user command like the working batch script
         $createResult = & net user $BackupAdminUser $BackupAdminPassword /add 2>&1
-        if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {  # 2 = already exists
+        if ($LASTEXITCODE -eq 0 -or $LASTEXITCODE -eq 2) {
+            # 2 = already exists
             Write-LogMessage "Backup admin account created/updated successfully" "Success"
 
             # Add to administrators group
@@ -305,7 +307,7 @@ Write-LogMessage "STEP 2: WINDOWS FIREWALL CONFIGURATION" "Info"
 Write-LogMessage ("=" * 70) "Info"
 
 try {
-    Set-NetFirewallProfile -Profile Domain,Public,Private -Enabled False
+    Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
     Write-LogMessage "Windows Firewall disabled for all profiles" "Success"
 }
 catch {
@@ -570,12 +572,20 @@ while ($RetryCount -lt $MaxRetries -and -not $FeatureInstalled) {
     }
 }
 
+
 # ============================================================================
-# STEP 8: PREREQUISITE SOFTWARE INSTALLATION
+# STEP 8: WinSewView CONFIGURATION
+# ============================================================================
+
+.\WinSetView.ps1 .\POSDefaults.ini
+Write-LogMessage "WinSetView configuration applied from POSDefaults.ini" "Success"
+
+# ============================================================================
+# STEP 9: PREREQUISITE SOFTWARE INSTALLATION
 # ============================================================================
 
 Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 8: PREREQUISITE SOFTWARE INSTALLATION" "Info"
+Write-LogMessage "STEP 9: PREREQUISITE SOFTWARE INSTALLATION" "Info"
 Write-LogMessage ("=" * 70) "Info"
 
 # Determine system architecture
@@ -584,7 +594,8 @@ $Is64Bit = [System.Environment]::Is64BitOperatingSystem
 # Install MS ODBC SQL Driver
 $ODBCInstaller = if ($Is64Bit) {
     Join-Path $ScriptDir "Installer Files Directory\FTX Pre-reqs\msodbcsql_x64.msi"
-} else {
+}
+else {
     Join-Path $ScriptDir "Installer Files Directory\FTX Pre-reqs\msodbcsql_x86.msi"
 }
 
@@ -601,7 +612,8 @@ if (Test-Path $ODBCInstaller) {
         $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -PassThru
         if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
             Write-LogMessage "MS ODBC SQL Driver installed successfully" "Success"
-        } else {
+        }
+        else {
             Write-LogMessage "MS ODBC SQL Driver installation returned code: $($process.ExitCode)" "Warning"
         }
     }
@@ -627,7 +639,8 @@ if (Test-Path $PosForDotNetInstaller) {
         $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -PassThru
         if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
             Write-LogMessage "PosForDotNet installed successfully" "Success"
-        } else {
+        }
+        else {
             Write-LogMessage "PosForDotNet installation returned code: $($process.ExitCode)" "Warning"
         }
     }
@@ -649,11 +662,11 @@ else {
 }
 
 # ============================================================================
-# STEP 9: DEVICE DRIVER INSTALLATIONS
+# STEP 10: DEVICE DRIVER INSTALLATIONS
 # ============================================================================
 
 Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 9: DEVICE DRIVER INSTALLATIONS" "Info"
+Write-LogMessage "STEP 10: DEVICE DRIVER INSTALLATIONS" "Info"
 Write-LogMessage ("=" * 70) "Info"
 
 $ManualInstallRequired = @()
@@ -713,7 +726,8 @@ if (Test-Path $TouchPointInstaller) {
         $process = Start-Process -FilePath "msiexec.exe" -ArgumentList $msiArgs -Wait -PassThru
         if ($process.ExitCode -eq 0 -or $process.ExitCode -eq 3010) {
             Write-LogMessage "TouchPoint Fingerprint Driver installed (restart will be performed later)" "Success"
-        } else {
+        }
+        else {
             Write-LogMessage "TouchPoint installation returned code: $($process.ExitCode)" "Warning"
         }
     }
@@ -788,11 +802,11 @@ else {
 }
 
 # ============================================================================
-# STEP 10: SCHEDULED TASKS AND UPDATES
-# ============================================================================
+# STEP 11: SCHEDULED TASKS AND UPDATES
+# =======================================================================
 
 Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 10: SCHEDULED TASKS AND UPDATES" "Info"
+Write-LogMessage "STEP 11: SCHEDULED TASKS AND UPDATES" "Info"
 Write-LogMessage ("=" * 70) "Info"
 
 # Create Scripts directory structure
@@ -936,11 +950,11 @@ echo %date% %time% - Windows Update check completed >> C:\Scripts\Logs\windows-u
     # Create scheduled task
     & schtasks /delete /tn "POS_WindowsUpdate" /f 2>$null
     & schtasks /create /tn "POS_WindowsUpdate" `
-             /tr "`"$WindowsUpdateScriptPath`"" `
-             /sc daily `
-             /st 02:00 `
-             /rl highest `
-             /f
+        /tr "`"$WindowsUpdateScriptPath`"" `
+        /sc daily `
+        /st 02:00 `
+        /rl highest `
+        /f
 
     Write-LogMessage "Scheduled task for Windows updates created (2:00 AM daily)" "Success"
 }
@@ -963,11 +977,11 @@ shutdown /r /t 60 /c "Scheduled nightly restart for POS system maintenance"
     # Create scheduled task
     & schtasks /delete /tn "POS_NightlyRestart" /f 2>$null
     & schtasks /create /tn "POS_NightlyRestart" `
-             /tr "`"$RestartScriptPath`"" `
-             /sc daily `
-             /st 03:00 `
-             /rl highest `
-             /f
+        /tr "`"$RestartScriptPath`"" `
+        /sc daily `
+        /st 03:00 `
+        /rl highest `
+        /f
 
     Write-LogMessage "Scheduled task for nightly restart created (3:00 AM daily)" "Success"
 }
@@ -976,11 +990,11 @@ catch {
 }
 
 # ============================================================================
-# STEP 11: ADDITIONAL SOFTWARE (ZOHO ASSIST & ZEBRA 123SCAN)
+# STEP 12: ADDITIONAL SOFTWARE (ZOHO ASSIST & ZEBRA 123SCAN)
 # ============================================================================
 
 Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 11: ADDITIONAL SOFTWARE" "Info"
+Write-LogMessage "STEP 12: ADDITIONAL SOFTWARE" "Info"
 Write-LogMessage ("=" * 70) "Info"
 
 # Zoho Assist
