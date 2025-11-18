@@ -4,3 +4,6 @@
 /Extra Utils/TM-T88III and T88IV.zip
 /Extra Utils/TM-T88VI/ADK300ER26.exe
 /Extra Utils/TM-T88VI/OPOSN1.14.37.exe
+
+# Log files
+*.log
