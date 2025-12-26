@@ -6,8 +6,7 @@ if (-Not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdent
     Exit
   }
 }
-
-
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned
 Write-Output "Disabling Windows Firewall..."
 Set-NetFirewallProfile -Profile Domain, Public, Private -Enabled False
 

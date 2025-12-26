@@ -1,4 +1,3 @@
-#Requires -RunAsAdministrator
 <#
 .SYNOPSIS
     Complete POS System Setup Script for Windows - Version 2
@@ -554,7 +553,7 @@ Write-LogMessage "Visit the FTX Zoho Unattended Installer link to download and i
 $ManualInstallRequired += "Zoho Assist (download from FTX link)"
 
 # Zebra 123Scan
-$Zebra123ScanPath = Join-Path $ScriptDir "Installer Files Directory\FTX Device Drivers\123Scan2_v2.1.exe"
+$Zebra123ScanPath = Join-Path $ScriptDir "Installer Files Directory\FTX Device Drivers\Zebra_123Scan_64bit_v6.00.0033.exe"
 if (Test-Path $Zebra123ScanPath) {
     Write-LogMessage "Found Zebra 123Scan installer locally" "Info"
     if (-not $SkipManualInstallers) {

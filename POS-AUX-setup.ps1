@@ -219,7 +219,6 @@ try {
     else {
         Write-LogMessage "Failed to remove password from $CurrentUser" "Warning"
     }
-    Set-LocalUser -Name "$CurrentUser" -PasswordNeverExpires $true
 }
 catch {
     Write-LogMessage "Failed to remove password: $_" "Warning"
@@ -296,91 +295,6 @@ catch {
     Write-LogMessage "Failed to configure power settings: $_" "Error"
 }
 
-# ============================================================================
-# STEP 4: LOCATION SERVICES AND TIME ZONE
-# ============================================================================
-
-Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 4: LOCATION SERVICES AND TIME ZONE" "Info"
-Write-LogMessage ("=" * 70) "Info"
-
-try {
-    # Enable Location Services - Create registry path if it doesn't exist
-    $LocationPath = "HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"
-    if (-not (Test-Path $LocationPath)) {
-        New-Item -Path $LocationPath -Force | Out-Null
-    }
-    Set-ItemProperty -Path $LocationPath -Name "Value" -Value "Allow"
-
-    # Also set for current user
-    $UserLocationPath = "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\location"
-    if (-not (Test-Path $UserLocationPath)) {
-        New-Item -Path $UserLocationPath -Force | Out-Null
-    }
-    Set-ItemProperty -Path $UserLocationPath -Name "Value" -Value "Allow"
-
-    # Enable Location Service
-    Set-Service -Name "lfsvc" -StartupType Automatic -ErrorAction SilentlyContinue
-    Start-Service -Name "lfsvc" -ErrorAction SilentlyContinue
-
-    Write-LogMessage "Location services enabled" "Success"
-
-    # Set time zone to update automatically
-    Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Services\tzautoupdate" -Name "Start" -Value 3
-    Write-LogMessage "Automatic time zone detection enabled" "Success"
-}
-catch {
-    Write-LogMessage "Failed to configure location/timezone settings: $_" "Error"
-}
-
-# ============================================================================
-# STEP 5: DESKTOP BACKGROUND
-# ============================================================================
-
-Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 5: DESKTOP BACKGROUND" "Info"
-Write-LogMessage ("=" * 70) "Info"
-
-$LogoSource = Join-Path $ScriptDir "sft-logo-blackbg.jpg"
-$LogoDestination = Join-Path $env:USERPROFILE "Pictures\sft-logo-blackbg.jpg"
-
-if (Test-Path $LogoSource) {
-    try {
-        # Create Pictures directory if it doesn't exist
-        $PicturesDir = Join-Path $env:USERPROFILE "Pictures"
-        if (-not (Test-Path $PicturesDir)) {
-            New-Item -Path $PicturesDir -ItemType Directory -Force | Out-Null
-        }
-
-        # Copy logo file
-        Copy-Item -Path $LogoSource -Destination $LogoDestination -Force
-
-        # Set as wallpaper with Fit style
-        Add-Type -TypeDefinition @"
-using System;
-using System.Runtime.InteropServices;
-public class Wallpaper {
-    [DllImport(`"user32.dll`", CharSet=CharSet.Auto)]
-    public static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
-}
-"@
-
-        # Set wallpaper style to Fit (6)
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "WallpaperStyle" -Value 6
-        Set-ItemProperty -Path "HKCU:\Control Panel\Desktop" -Name "TileWallpaper" -Value 0
-
-        # Apply wallpaper
-        [Wallpaper]::SystemParametersInfo(0x0014, 0, $LogoDestination, 0x0001 -bor 0x0002)
-
-        Write-LogMessage "Desktop background set to SFT logo" "Success"
-    }
-    catch {
-        Write-LogMessage "Failed to set desktop background: $_" "Error"
-    }
-}
-else {
-    Write-LogMessage "Logo file not found at: $LogoSource" "Warning"
-}
 
 # ============================================================================
 # STEP 6: FIREFOX INSTALLATION AND CONFIGURATION
@@ -466,49 +380,6 @@ catch {
     Write-LogMessage "Failed to remove Edge shortcuts: $_" "Warning"
 }
 
-# ============================================================================
-# STEP 7: WINDOWS FEATURES (.NET FRAMEWORK)
-# ============================================================================
-
-Write-LogMessage ("=" * 70) "Info"
-Write-LogMessage "STEP 7: WINDOWS FEATURES (.NET FRAMEWORK)" "Info"
-Write-LogMessage ("=" * 70) "Info"
-
-# Enable .NET Framework 3.5 and 4.8 with retry logic
-$MaxRetries = 3
-$RetryCount = 0
-$FeatureInstalled = $false
-
-while ($RetryCount -lt $MaxRetries -and -not $FeatureInstalled) {
-    try {
-        Write-LogMessage "Enabling .NET Framework features (Attempt $($RetryCount + 1) of $MaxRetries)..." "Info"
-
-        # Enable .NET 3.5
-        $NetFx3Result = Enable-WindowsOptionalFeature -Online -FeatureName "NetFx3" -All -NoRestart -ErrorAction Stop
-        $HttpActivationResult = Enable-WindowsOptionalFeature -Online -FeatureName "WCF-HTTP-Activation" -All -NoRestart -ErrorAction Stop
-        $NonHttpActivationResult = Enable-WindowsOptionalFeature -Online -FeatureName "WCF-NonHTTP-Activation" -All -NoRestart -ErrorAction Stop
-
-
-        # Enable .NET 4.8 Advanced Services
-        $NetFx4Result = Enable-WindowsOptionalFeature -Online -FeatureName "NetFx4-AdvSrvs" -All -NoRestart -ErrorAction Stop
-        $AspNetResult = Enable-WindowsOptionalFeature -Online -FeatureName "NetFx4Extended-ASPNET45" -All -NoRestart -ErrorAction Stop
-
-        Write-LogMessage ".NET Framework features enabled successfully" "Success"
-        $FeatureInstalled = $true
-    }
-    catch {
-        $RetryCount++
-        if ($RetryCount -lt $MaxRetries) {
-            Write-LogMessage "Installation failed, retrying in 10 seconds..." "Warning"
-            Write-LogMessage "Error: $_" "Warning"
-            Start-Sleep -Seconds 10
-        }
-        else {
-            Write-LogMessage ".NET Framework installation failed after $MaxRetries attempts. May require manual installation." "Error"
-            Write-LogMessage "Error details: $_" "Error"
-        }
-    }
-}
 
 
 # ============================================================================
@@ -606,6 +477,257 @@ else {
 }
 
 
+
+# ============================================================================
+# STEP 10: Enable Force Biometrics in FTX config
+# ============================================================================
+
+Write-LogMessage ("=" * 70) "Info"
+Write-LogMessage "STEP 10: Enable Force Biometrics in FTX config" "Info"
+Write-LogMessage ("=" * 70) "Info"
+
+$iniFilePath = "C:\ProgramData\FasTraxPOS\Config\FTXConfiguration.ini" # Replace with your INI file path
+$targetSection = "[POS]" # Replace with your target section name
+$newLineToAdd = "ForceBiometricTimeClock=1" # Replace with the line you want to add
+
+$iniContent = Get-Content -Path $iniFilePath
+$newContent = @()
+$inTargetSection = $false
+$lineAlreadyExists = $false
+
+# First check if the file exists
+if (Test-Path $iniFilePath) {
+    foreach ($line in $iniContent) {
+        $newContent += $line # Add the current line to the new content
+
+        if ($line.Trim() -eq $targetSection) {
+            $inTargetSection = $true
+            # Check if the line to add already exists in the section (after the section header)
+            # This assumes the line would appear immediately after the section header or later within the section.
+            # A more robust check might involve iterating until the next section or end of file.
+            $remainingContent = $iniContent | Select-Object -Skip (($iniContent.IndexOf($line)) + 1)
+            if ($remainingContent -match "^$([regex]::Escape($newLineToAdd))$") {
+                $lineAlreadyExists = $true
+            }
+        }
+        elseif ($inTargetSection -and $line.Trim().StartsWith("[")) {
+            # If we encounter another section header, we are no longer in the target section
+            $inTargetSection = $false
+        }
+
+        # If we are in the target section and the line hasn't been added yet, and it doesn't already exist
+        if ($inTargetSection -and -not $lineAlreadyExists -and $line.Trim() -notmatch "^$([regex]::Escape($newLineToAdd))$") {
+            # This condition will add the line only once, right after the section header.
+            # If you want it at the end of the section, you would need to buffer lines until the next section or end of file.
+            if ($line.Trim() -eq $targetSection) {
+                $newContent += $newLineToAdd
+                $lineAlreadyExists = $true # Mark as added to prevent multiple additions
+            }
+        }
+    }
+
+    # If the section was found and the line was not added within the loop (e.g., if it needs to be at the very end of the section)
+    # This part is more complex and depends on where exactly you want the line if the section is empty or the line should be last.
+    # For simplicity, the above code adds it directly after the section header if not present.
+
+    $newContent | Set-Content -Path $iniFilePath -Force
+}
+else {
+    Write-LogMessage "INI file not found: $iniFilePath" "Error"
+}
+
+
+
+# ============================================================================
+# STEP 12: SCHEDULED TASKS AND UPDATES
+# =======================================================================
+
+Write-LogMessage ("=" * 70) "Info"
+Write-LogMessage "STEP 12: SCHEDULED TASKS AND UPDATES" "Info"
+Write-LogMessage ("=" * 70) "Info"
+
+# Create Scripts directory structure
+$ScriptsPath = "C:\Scripts"
+$LogsPath = "C:\Scripts\Logs"
+$BackupPath = "C:\Scripts\Backup"
+
+foreach ($path in @($ScriptsPath, $LogsPath, $BackupPath)) {
+    if (-not (Test-Path $path)) {
+        New-Item -Path $path -ItemType Directory -Force | Out-Null
+        Write-LogMessage "Created directory: $path" "Info"
+    }
+}
+
+# Copy update scripts if they exist
+$UpdateScriptsSource = Join-Path $ScriptDir "Scripts"
+if (Test-Path $UpdateScriptsSource) {
+    Write-LogMessage "Copying update scripts..." "Info"
+    try {
+        Copy-Item -Path "$UpdateScriptsSource\*" -Destination $ScriptsPath -Force -Recurse
+        Write-LogMessage "Update scripts copied to C:\Scripts" "Success"
+    }
+    catch {
+        Write-LogMessage "Failed to copy update scripts: $_" "Error"
+    }
+}
+
+# Configure Windows Update service
+try {
+    Set-Service -Name "wuauserv" -StartupType Automatic
+    Start-Service -Name "wuauserv" -ErrorAction SilentlyContinue
+
+    # Configure automatic updates
+    $WUPath = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate"
+    $AUPath = "$WUPath\AU"
+
+    if (-not (Test-Path $WUPath)) {
+        New-Item -Path $WUPath -Force | Out-Null
+    }
+    if (-not (Test-Path $AUPath)) {
+        New-Item -Path $AUPath -Force | Out-Null
+    }
+
+    Set-ItemProperty -Path $AUPath -Name "NoAutoUpdate" -Value 0
+    Set-ItemProperty -Path $AUPath -Name "AUOptions" -Value 4  # Auto download and schedule install
+    Set-ItemProperty -Path $AUPath -Name "ScheduledInstallDay" -Value 0  # Every day
+    Set-ItemProperty -Path $AUPath -Name "ScheduledInstallTime" -Value 2  # 2 AM
+
+    Write-LogMessage "Windows Update configured for automatic updates" "Success"
+}
+catch {
+    Write-LogMessage "Failed to configure Windows Update: $_" "Error"
+}
+
+# Create scheduled task for FasTrax updates (2 AM)
+try {
+    $UpdateScriptPath = Join-Path $ScriptsPath "POS-Update.bat"
+    if (Test-Path $UpdateScriptPath) {
+        # Remove existing task if it exists
+        & schtasks /delete /tn "FasTrax_NightlyUpdate" /f 2>$null
+
+        # Create new scheduled task
+        $taskXml = @"
+<?xml version=`"1.0`" encoding=`"UTF-16`"?>
+<Task version=`"1.2`" xmlns=`"http://schemas.microsoft.com/windows/2004/02/mit/task`">
+  <Triggers>
+    <CalendarTrigger>
+      <StartBoundary>2024-01-01T02:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+      <ScheduleByDay>
+        <DaysInterval>1</DaysInterval>
+      </ScheduleByDay>
+    </CalendarTrigger>
+  </Triggers>
+  <Principals>
+    <Principal id=`"Author`">
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <AllowHardTerminate>true</AllowHardTerminate>
+    <StartWhenAvailable>true</StartWhenAvailable>
+    <RunOnlyIfNetworkAvailable>false</RunOnlyIfNetworkAvailable>
+    <IdleSettings>
+      <StopOnIdleEnd>false</StopOnIdleEnd>
+      <RestartOnIdle>false</RestartOnIdle>
+    </IdleSettings>
+    <AllowStartOnDemand>true</AllowStartOnDemand>
+    <Enabled>true</Enabled>
+    <Hidden>false</Hidden>
+    <RunOnlyIfIdle>false</RunOnlyIfIdle>
+    <WakeToRun>true</WakeToRun>
+    <ExecutionTimeLimit>PT2H</ExecutionTimeLimit>
+    <Priority>7</Priority>
+  </Settings>
+  <Actions Context=`"Author`">
+    <Exec>
+      <Command>$UpdateScriptPath</Command>
+    </Exec>
+  </Actions>
+</Task>
+"@
+        $taskXmlPath = Join-Path $env:TEMP "fastrax_update_task.xml"
+        $taskXml | Out-File -FilePath $taskXmlPath -Encoding Unicode
+
+        & schtasks /create /tn "FasTrax_NightlyUpdate" /xml $taskXmlPath /f
+
+        if ($LASTEXITCODE -eq 0) {
+            Write-LogMessage "Scheduled task for FasTrax nightly updates created successfully (2:00 AM)" "Success"
+        }
+        else {
+            Write-LogMessage "Failed to create FasTrax update scheduled task" "Error"
+        }
+
+        Remove-Item $taskXmlPath -Force -ErrorAction SilentlyContinue
+    }
+    else {
+        Write-LogMessage "POS-Update.bat not found - FasTrax update task not created" "Warning"
+    }
+}
+catch {
+    Write-LogMessage "Failed to create FasTrax update task: $_" "Error"
+}
+
+# Create scheduled task for nightly Windows updates (2 AM - matches the batch file)
+try {
+    # Create Windows update script
+    $WindowsUpdateScript = @'
+@echo off
+echo %date% %time% - Windows Update check initiated >> C:\Scripts\Logs\windows-update.log
+powershell -Command "Install-Module PSWindowsUpdate -Force -ErrorAction SilentlyContinue; Get-WindowsUpdate -Install -AcceptAll -IgnoreReboot" >> C:\Scripts\Logs\windows-update.log 2>&1
+echo %date% %time% - Windows Update check completed >> C:\Scripts\Logs\windows-update.log
+'@
+
+    $WindowsUpdateScriptPath = Join-Path $ScriptsPath "Windows-Update.bat"
+    $WindowsUpdateScript | Out-File -FilePath $WindowsUpdateScriptPath -Encoding ASCII
+
+    # Create scheduled task
+    & schtasks /delete /tn "POS_WindowsUpdate" /f 2>$null
+    & schtasks /create /tn "POS_WindowsUpdate" `
+        /tr "`"$WindowsUpdateScriptPath`"" `
+        /sc daily `
+        /st 02:00 `
+        /rl highest `
+        /f
+
+    Write-LogMessage "Scheduled task for Windows updates created (2:00 AM daily)" "Success"
+}
+catch {
+    Write-LogMessage "Failed to create Windows update task: $_" "Error"
+}
+
+# Create scheduled task for nightly restart (3 AM)
+try {
+    # Create restart script
+    $RestartScript = @'
+@echo off
+echo %date% %time% - Nightly restart initiated >> C:\Scripts\Logs\restart.log
+shutdown /r /t 60 /c "Scheduled nightly restart for POS system maintenance"
+'@
+
+    $RestartScriptPath = Join-Path $ScriptsPath "Nightly-Restart.bat"
+    $RestartScript | Out-File -FilePath $RestartScriptPath -Encoding ASCII
+
+    # Create scheduled task
+    & schtasks /delete /tn "POS_NightlyRestart" /f 2>$null
+    & schtasks /create /tn "POS_NightlyRestart" `
+        /tr "`"$RestartScriptPath`"" `
+        /sc daily `
+        /st 03:00 `
+        /rl highest `
+        /f
+
+    Write-LogMessage "Scheduled task for nightly restart created (3:00 AM daily)" "Success"
+}
+catch {
+    Write-LogMessage "Failed to create nightly restart task: $_" "Error"
+}
+
+
+
 # ============================================================================
 # INSTALLATION SUMMARY
 # ============================================================================
@@ -642,7 +764,6 @@ Stop-Transcript
 
 
 
-irm "https://christitus.com/win" | iex
 
 
 Write-Host ""
